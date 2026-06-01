@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RiceGuard AI – YOLOv11s + BiFormer P4</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green-900: #052e16;
+    --green-800: #14532d;
+    --green-600: #16a34a;
+    --green-500: #22c55e;
+    --green-400: #4ade80;
+    --green-200: #bbf7d0;
+    --emerald: #10b981;
+    --glass-bg: rgba(255,255,255,0.07);
+    --glass-border: rgba(255,255,255,0.15);
+    --glass-hover: rgba(255,255,255,0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Be Vietnam Pro', sans-serif;
+    background: #030d06;
+    color: #e2e8f0;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 20% 10%, rgba(16,185,129,0.18) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(34,197,94,0.12) 0%, transparent 50%),
+      radial-gradient(ellipse 40% 60% at 50% 50%, rgba(5,46,22,0.8) 0%, transparent 80%);
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* Noise grain overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.4;
+  }
+
+  .relative-z { position: relative; z-index: 2; }
+
+  /* Glassmorphism card */
+  .glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(16px) saturate(1.5);
+    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+    border-radius: 16px;
+    transition: all 0.3s ease;
+  }
+  .glass:hover { background: var(--glass-hover); border-color: rgba(74,222,128,0.25); }
+
+  /* Navbar */
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(3,13,6,0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding: 0 2rem;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 1.1rem; font-weight: 700;
+    color: var(--green-400);
+    letter-spacing: -0.02em;
+  }
+  .logo span { color: #e2e8f0; }
+  .nav-badge {
+    font-size: 0.65rem; padding: 2px 8px; border-radius: 99px;
+    background: rgba(74,222,128,0.15); color: var(--green-400);
+    border: 1px solid rgba(74,222,128,0.3);
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 0.05em;
+  }
+  .nav-links a {
+    color: rgba(255,255,255,0.6); text-decoration: none; font-size: 0.875rem;
+    margin-left: 2rem; transition: color 0.2s;
+  }
+  .nav-links a:hover, .nav-links a.active { color: var(--green-400); }
+
+  /* Hero */
+  .hero { padding: 5rem 2rem 3rem; text-align: center; }
+  .hero-label {
+    display: inline-block; margin-bottom: 1rem;
+    font-size: 0.75rem; font-family: 'Space Mono', monospace;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--green-400);
+    padding: 6px 16px; border-radius: 99px;
+    background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.25);
+  }
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 700; line-height: 1.15;
+    background: linear-gradient(135deg, #fff 0%, #a7f3d0 50%, var(--green-400) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 1rem;
+  }
+  .hero p { color: rgba(255,255,255,0.5); font-size: 1.05rem; max-width: 580px; margin: 0 auto 2.5rem; line-height: 1.7; }
+
+  /* Stats row */
+  .stats-row { display: flex; justify-content: center; gap: 2rem; margin-bottom: 3rem; flex-wrap: wrap; }
+  .stat-item { text-align: center; }
+  .stat-num { font-family: 'Space Mono', monospace; font-size: 1.5rem; font-weight: 700; color: var(--green-400); }
+  .stat-label { font-size: 0.75rem; color: rgba(255,255,255,0.4); margin-top: 2px; }
+
+  /* Main content */
+  .main { max-width: 1100px; margin: 0 auto; padding: 0 1.5rem 5rem; }
+  .section-title {
+    font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: rgba(255,255,255,0.3); font-family: 'Space Mono', monospace;
+    margin-bottom: 1rem; padding-left: 2px;
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 2px dashed rgba(74,222,128,0.3);
+    border-radius: 20px;
+    padding: 3.5rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: rgba(16,185,129,0.04);
+    position: relative;
+    overflow: hidden;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--green-400);
+    background: rgba(74,222,128,0.08);
+    transform: translateY(-2px);
+  }
+  .upload-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer;
+  }
+  .upload-icon {
+    width: 56px; height: 56px; margin: 0 auto 1.25rem;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: rgba(74,222,128,0.15); border: 1px solid rgba(74,222,128,0.3);
+  }
+  .upload-icon svg { width: 26px; height: 26px; stroke: var(--green-400); }
+  .upload-zone h3 { font-size: 1.05rem; font-weight: 600; color: #e2e8f0; margin-bottom: 0.4rem; }
+  .upload-zone p { font-size: 0.85rem; color: rgba(255,255,255,0.4); }
+  .upload-zone .formats {
+    margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;
+  }
+  .fmt-badge {
+    font-size: 0.7rem; padding: 3px 10px; border-radius: 4px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.5); font-family: 'Space Mono', monospace;
+  }
+
+  /* Preview */
+  .preview-section { display: none; }
+  .preview-section.visible { display: block; }
+  .preview-img-wrap {
+    position: relative; border-radius: 12px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .preview-img-wrap img { width: 100%; display: block; max-height: 340px; object-fit: contain; background: #000; }
+  .remove-btn {
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.2);
+    color: #fff; width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 1rem; transition: all 0.2s;
+  }
+  .remove-btn:hover { background: rgba(220,38,38,0.6); }
+
+  /* Submit button */
+  .btn-primary {
+    display: block; width: 100%; padding: 0.875rem;
+    background: linear-gradient(135deg, var(--green-600), var(--emerald));
+    color: #fff; font-weight: 600; font-size: 0.95rem;
+    border: none; border-radius: 12px; cursor: pointer;
+    transition: all 0.3s ease; letter-spacing: 0.02em;
+    margin-top: 1rem;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(16,185,129,0.3); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* Loading spinner */
+  .loading-overlay {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(3,13,6,0.9); backdrop-filter: blur(8px);
+    align-items: center; justify-content: center; flex-direction: column; gap: 1rem;
+  }
+  .loading-overlay.active { display: flex; }
+  .spinner {
+    width: 48px; height: 48px; border: 3px solid rgba(74,222,128,0.2);
+    border-top-color: var(--green-400); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Result section */
+  .result-section { display: none; }
+  .result-section.visible { display: block; }
+
+  /* Confidence bar */
+  .conf-bar-bg { height: 8px; border-radius: 99px; background: rgba(255,255,255,0.08); overflow: hidden; }
+  .conf-bar-fill { height: 100%; border-radius: 99px; transition: width 1s cubic-bezier(0.16,1,0.3,1); }
+
+  /* Disease label badge */
+  .disease-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 16px; border-radius: 99px;
+    font-weight: 600; font-size: 0.9rem;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Treatment table */
+  .treatment-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  .treatment-table th {
+    text-align: left; padding: 10px 14px; color: rgba(255,255,255,0.4);
+    font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    font-family: 'Space Mono', monospace; font-weight: 400;
+  }
+  .treatment-table td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .treatment-table tr:last-child td { border-bottom: none; }
+
+  /* History table */
+  .hist-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .hist-table th {
+    text-align: left; padding: 10px 12px;
+    color: rgba(255,255,255,0.35); font-size: 0.72rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    font-family: 'Space Mono', monospace; font-weight: 400;
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .hist-table td { padding: 12px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .hist-table tr:hover td { background: rgba(74,222,128,0.04); }
+
+  /* Pagination */
+  .pagination { display: flex; justify-content: center; gap: 0.5rem; margin-top: 1.25rem; }
+  .page-btn {
+    width: 36px; height: 36px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12);
+    background: transparent; color: rgba(255,255,255,0.5); cursor: pointer;
+    font-size: 0.85rem; transition: all 0.2s; font-family: 'Be Vietnam Pro', sans-serif;
+  }
+  .page-btn:hover { border-color: var(--green-400); color: var(--green-400); }
+  .page-btn.active { background: var(--green-600); border-color: var(--green-600); color: #fff; }
+
+  /* Severity color mapping */
+  .sev-high { color: #f87171; }
+  .sev-med  { color: #fb923c; }
+  .sev-low  { color: var(--green-400); }
+  .sev-healthy { color: #34d399; }
+
+  /* Tab selector */
+  .tab-bar { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; overflow-x: auto; padding-bottom: 4px; }
+  .tab-btn {
+    padding: 8px 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
+    background: transparent; color: rgba(255,255,255,0.45);
+    cursor: pointer; font-size: 0.875rem; transition: all 0.25s;
+    font-family: 'Be Vietnam Pro', sans-serif;
+    white-space: nowrap;
+  }
+  .tab-btn.active { background: rgba(74,222,128,0.12); border-color: rgba(74,222,128,0.3); color: var(--green-400); }
+
+  /* Disease Info styles */
+  .disease-card { overflow: hidden; display: flex; flex-direction: column; }
+  .disease-card-img { height: 180px; width: 100%; object-fit: cover; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  
+  /* Model Insight styles */
+  .flow-node {
+    padding: 1rem; border-radius: 12px; text-align: center;
+    border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03);
+    min-width: 140px; position: relative;
+  }
+  .flow-arrow { color: var(--green-400); font-size: 1.5rem; display: flex; align-items: center; justify-content: center; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    nav { padding: 0 1rem; }
+    .hero { padding: 3rem 1rem 2rem; }
+    .stats-row { gap: 1.25rem; }
+    .main { padding: 0 1rem 4rem; }
+    .nav-links { display: none; }
+    .two-col { grid-template-columns: 1fr !important; }
+    .flow-container { flex-direction: column; gap: 1rem !important; }
+    .flow-arrow { transform: rotate(90deg); margin: 0.25rem 0; }
+  }
+
+  /* Fade-in animation */
+  .relative-z { animation: fadeIn 0.5s ease forwards; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="relative-z">
+  <div class="logo">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/>
+      <path d="M12 6v6l4 2"/>
+    </svg>
+    Rice<span>Guard</span>
+    <span class="nav-badge">AI v2.0</span>
+  </div>
+  <div class="nav-links">
+    <a href="#diagnose" class="active" onclick="switchNavbarTab('diagnose', this)">Chẩn đoán</a>
+    <a href="#history" onclick="switchNavbarTab('history', this)">Lịch sử</a>
+    <a href="#disease-info" onclick="switchNavbarTab('disease-info', this)">Tri thức bệnh</a>
+    <a href="#model-insight" onclick="switchNavbarTab('model-insight', this)">Về mô hình</a>
+    <a href="#analytics" onclick="switchNavbarTab('analytics', this)">Hiệu năng</a>
+  </div>
+</nav>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div style="font-size:0.9rem; color:rgba(255,255,255,0.5);">Đang phân tích hình ảnh...</div>
+  <div style="font-size:0.75rem; color:rgba(255,255,255,0.3); font-family:'Space Mono',monospace;">YoloV11s + BiFormer P4 đang xử lý</div>
+</div>
+
+<!-- Hero -->
+<div class="hero relative-z">
+  <div class="hero-label">Deep Learning × Smart Agriculture</div>
+  <h1>Chẩn đoán bệnh lúa<br>bằng Trí tuệ Nhân tạo</h1>
+  <p>Phát hiện chính xác các loại bệnh lá lúa với mô hình <strong>YoloV11s + BiFormer P4</strong>, tối ưu cho vết bệnh siêu nhỏ và mờ trong nông nghiệp thông minh.</p>
+  <div class="stats-row">
+    <div class="stat-item"><div class="stat-num">5</div><div class="stat-label">Loại bệnh</div></div>
+    <div class="stat-item"><div class="stat-num">P4</div><div class="stat-label">Scale head</div></div>
+    <div class="stat-item"><div class="stat-num">BiFormer</div><div class="stat-label">Neck attention</div></div>
+    <div class="stat-item"><div class="stat-num">4-scale</div><div class="stat-label">Detection</div></div>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="main relative-z" id="upload-sec">
+
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('diagnose', this)">Chẩn đoán</button>
+    <button class="tab-btn" onclick="switchTab('history', this)">Lịch sử</button>
+    <button class="tab-btn" onclick="switchTab('disease-info', this)">Tri thức bệnh</button>
+    <button class="tab-btn" onclick="switchTab('model-insight', this)">Về mô hình</button>
+    <button class="tab-btn" onclick="switchTab('analytics', this)">Hiệu năng</button>
+  </div>
+
+  <!-- === DIAGNOSE TAB === -->
+  <div id="tab-diagnose">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;" class="two-col">
+
+      <!-- Left: Upload -->
+      <div>
+        <div class="section-title">Tải ảnh lên</div>
+
+        <!-- Model selection dropdown -->
+        <div style="margin-bottom:1.25rem; text-align:left;">
+          <label for="modelSelect" style="display:block; font-size:0.8rem; color:rgba(255,255,255,0.45); margin-bottom:0.35rem; font-family:'Be Vietnam Pro',sans-serif;">Mô hình nhận diện:</label>
+          <select id="modelSelect" style="width:100%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.85); padding:10px; border-radius:8px; font-size:0.85rem; font-family:'Be Vietnam Pro',sans-serif; cursor:pointer; outline:none; transition: all 0.2s;">
+            <option value="YOLOv11s-50e" selected>YOLOv11s-50e</option>
+            <option value="BiFormer-P4-40e">BiFormer-P4-40e</option>
+          </select>
+        </div>
+
+        <!-- Upload zone (hidden when preview shown) -->
+        <div class="upload-zone" id="uploadZone">
+          <input type="file" accept="image/jpeg,image/png,image/webp" id="fileInput" onchange="handleFile(event)">
+          <div class="upload-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="16 16 12 12 8 16"/>
+              <line x1="12" y1="12" x2="12" y2="21"/>
+              <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+            </svg>
+          </div>
+          <h3>Kéo thả hoặc chọn ảnh</h3>
+          <p>Chụp ảnh lá lúa từ điện thoại hoặc máy tính</p>
+          <div class="formats">
+            <span class="fmt-badge">JPG</span>
+            <span class="fmt-badge">PNG</span>
+            <span class="fmt-badge">WEBP</span>
+            <span class="fmt-badge">max 10MB</span>
+          </div>
+        </div>
+
+        <!-- Preview section -->
+        <div class="preview-section" id="previewSection">
+          <div class="preview-img-wrap">
+            <img id="previewImg" src="" alt="Ảnh đã chọn">
+            <button class="remove-btn" onclick="resetUpload()" title="Xóa ảnh">✕</button>
+          </div>
+          <div style="margin-top:0.75rem; padding:0.75rem 1rem; border-radius:10px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);">
+            <div style="font-size:0.8rem; color:rgba(255,255,255,0.4);" id="fileInfo">—</div>
+          </div>
+          <button class="btn-primary" id="diagnoseBtn" onclick="submitDiagnosis()">
+            🔍 Phân tích bệnh lá lúa
+          </button>
+        </div>
+      </div>
+
+      <!-- Right: Result -->
+      <div>
+        <div class="section-title">Kết quả chẩn đoán</div>
+
+        <!-- Placeholder -->
+        <div class="glass" id="resultPlaceholder" style="padding:2.5rem; text-align:center; min-height:280px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:1rem;">
+          <div style="width:48px; height:48px; border-radius:50%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; font-size:1.5rem;">🌾</div>
+          <div style="font-size:0.9rem; color:rgba(255,255,255,0.3);">Tải ảnh lên để bắt đầu phân tích</div>
+        </div>
+
+        <!-- Result card -->
+        <div class="result-section glass fade-in" id="resultCard" style="padding:1.5rem;">
+          <!-- Disease header -->
+          <div style="margin-bottom:1.25rem;">
+            <div style="font-size:0.7rem; color:rgba(255,255,255,0.3); margin-bottom:8px; font-family:'Space Mono',monospace; text-transform:uppercase; letter-spacing:0.1em;">Kết quả phát hiện</div>
+            <div id="diseaseBadge" class="disease-badge" style="background:rgba(74,222,128,0.12); border:1px solid rgba(74,222,128,0.3);">
+              <span class="dot" style="background:var(--green-400);"></span>
+              <span id="diseaseLabel" style="color:var(--green-400);">—</span>
+            </div>
+          </div>
+
+          <!-- Confidence -->
+          <div style="margin-bottom:1.25rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+              <span style="font-size:0.8rem; color:rgba(255,255,255,0.45);">Độ tin cậy</span>
+              <span id="confValue" style="font-family:'Space Mono',monospace; font-size:0.85rem; color:var(--green-400); font-weight:700;">—</span>
+            </div>
+            <div class="conf-bar-bg">
+              <div class="conf-bar-fill" id="confBar" style="width:0%; background:linear-gradient(90deg, #16a34a, #4ade80);"></div>
+            </div>
+          </div>
+
+          <!-- Annotated image -->
+          <div id="annotatedWrap" style="display:none; margin-bottom:1.25rem;">
+            <div style="font-size:0.7rem; color:rgba(255,255,255,0.3); margin-bottom:6px; font-family:'Space Mono',monospace; text-transform:uppercase; letter-spacing:0.1em;">Ảnh phát hiện (Bounding Box)</div>
+            <div style="border-radius:10px; overflow:hidden; border:1px solid rgba(255,255,255,0.08);">
+              <img id="annotatedImg" src="" alt="Annotated" style="width:100%; display:block;">
+            </div>
+          </div>
+
+          <!-- Treatment summary -->
+          <div style="background:rgba(255,255,255,0.04); border-radius:10px; padding:12px 14px; border:1px solid rgba(255,255,255,0.07);">
+            <div style="font-size:0.72rem; color:rgba(255,255,255,0.3); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.08em; font-family:'Space Mono',monospace;">Hướng dẫn xử lý</div>
+            <div id="treatmentText" style="font-size:0.85rem; color:rgba(255,255,255,0.7); line-height:1.6;">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Treatment guide table (full width) -->
+    <div style="margin-top:2rem;">
+      <div class="section-title">Bảng hướng dẫn xử lý bệnh lúa</div>
+      <div class="glass" style="overflow:hidden;">
+        <table class="treatment-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Tên bệnh</th><th>Triệu chứng nhận biết</th><th>Biện pháp xử lý</th><th>Mức độ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-family:'Space Mono',monospace; color:rgba(255,255,255,0.3); font-size:0.8rem;">0</td>
+              <td style="font-weight:600;">Đạo Ôn (Leaf Blast)</td>
+              <td style="color:rgba(255,255,255,0.55); font-size:0.8rem;">Vết nâu hình thoi, viền nâu đỏ, tâm xám nhạt</td>
+              <td style="color:rgba(255,255,255,0.55); font-size:0.8rem;">Tricyclazole, Isoprothiolane. Thoát nước ruộng 3-5 ngày</td>
+              <td><span class="sev-high" style="font-weight:600; font-size:0.8rem;">● Cao</span></td>
+            </tr>
+            <tr>
+              <td style="font-family:'Space Mono',monospace; color:rgba(255,255,255,0.3); font-size:0.8rem;">1</td>
+              <td style="font-weight:600;">Bạc Lá (BLB)</td>
+              <td style="color:rgba(255,255,255,0.55); font-size:0.8rem;">Rìa lá vàng, khô dọc mép, mép gợn sóng màu xám</td>
+              <td style="color:rgba(255,255,255,0.55); font-size:0.8rem;">Thuốc gốc đồng, bón kali cân đối, tránh thừa đạm</td>
+              <td><span class="sev-high" style="font-weight:600; font-size:0.8rem;">● Cao</span></td>
+            </tr>
+            <tr>
+              <td style="font-family:'Space Mono',monospace; color:rgba(255,255,255,0.3); font-size:0.8rem;">2</td>
+              <td style="font-weight:600;">Khô Vằn (Sheath Blight)</td>
+              <td style="color:rgba(255,255,255,0.55); font-size:0.8rem;">Mảng xanh xám loang lổ như vân mây ở bẹ sát gốc</td>
+              <td style="color:rgba(255,255,255,0.55); font-size:0.8rem;">Validamycin, Hexaconazole. Tỉa cây thưa để thoáng gió</td>
+              <td><span class="sev-med" style="font-weight:600; font-size:0.8rem;">● Trung bình</span></td>
+            </tr>
+            <tr>
+              <td style="font-family:'Space Mono',monospace; color:rgba(255,255,255,0.3); font-size:0.8rem;">3</td>
+              <td style="font-weight:600;">Đốm Nâu (Brown Spot)</td>
+              <td style="color:rgba(255,255,255,0.55); font-size:0.8rem;">Đốm nhỏ hình tròn/bầu dục nâu rải rác phủ kín lá</td>
+              <td style="color:rgba(255,255,255,0.55); font-size:0.8rem;">Bón thêm phân kali, phun Mancozeb hoặc Propiconazole</td>
+              <td><span class="sev-med" style="font-weight:600; font-size:0.8rem;">● Trung bình</span></td>
+            </tr>
+            <tr>
+              <td style="font-family:'Space Mono',monospace; color:rgba(255,255,255,0.3); font-size:0.8rem;">4</td>
+              <td style="font-weight:600; color:#34d399;">Lá Khỏe (Healthy)</td>
+              <td style="color:rgba(255,255,255,0.55); font-size:0.8rem;">Lá xanh đều, không vết bệnh, thẳng đứng quang hợp tốt</td>
+              <td style="color:rgba(255,255,255,0.55); font-size:0.8rem;">Chăm bón theo quy trình hiện tại, kiểm tra định kỳ</td>
+              <td><span class="sev-healthy" style="font-weight:600; font-size:0.8rem;">● Khỏe</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- === HISTORY TAB === -->
+  <div id="tab-history" style="display:none;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem;">
+      <div style="font-size:0.8rem; color:rgba(255,255,255,0.4);" id="histCount">Tổng: — bản ghi</div>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <select id="filterDisease" onchange="filterHistory()" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.7); padding:6px 12px; border-radius:8px; font-size:0.8rem; font-family:'Be Vietnam Pro',sans-serif; cursor:pointer;">
+          <option value="">Tất cả bệnh</option>
+          <option value="Leaf Blast">Đạo Ôn</option>
+          <option value="Bacterial Leaf Blight">Bạc Lá</option>
+          <option value="Sheath Blight">Khô Vằn</option>
+          <option value="Brown Spot">Đốm Nâu</option>
+          <option value="Healthy">Lá Khỏe</option>
+        </select>
+        <button onclick="loadHistory()" style="background:rgba(74,222,128,0.1); border:1px solid rgba(74,222,128,0.25); color:var(--green-400); padding:6px 14px; border-radius:8px; font-size:0.8rem; cursor:pointer; font-family:'Be Vietnam Pro',sans-serif;">↻ Làm mới</button>
+      </div>
+    </div>
+
+    <div class="glass" style="overflow:hidden;">
+      <table class="hist-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Tên bệnh</th>
+            <th>Confidence</th>
+            <th>Thời gian</th>
+            <th>Hành động</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody">
+          <tr><td colspan="5" style="text-align:center; padding:2.5rem; color:rgba(255,255,255,0.25);">Chưa có dữ liệu. Thực hiện chẩn đoán trước.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <!-- === DISEASE INFO TAB === -->
+  <div id="tab-disease-info" style="display:none;">
+    <div class="section-title">Danh mục 5 loại bệnh hại lúa chính</div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      
+      <!-- Card 1: Leaf Blast -->
+      <div class="glass disease-card">
+        <img src="uploads/rice_leaf_blast.png" alt="Đạo ôn" class="disease-card-img">
+        <div class="p-5 flex-1 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-start mb-2">
+              <h3 class="font-bold text-lg text-white">Đạo Ôn</h3>
+              <span class="text-xs px-2.5 py-1 rounded bg-red-500/10 border border-red-500/30 text-red-400 font-semibold">● Nguy cơ cao</span>
+            </div>
+            <p class="text-xs font-mono text-emerald-400 mb-3">Leaf Blast (Magnaporthe oryzae)</p>
+            <p class="text-sm text-gray-400 leading-relaxed mb-4">Bệnh do nấm gây ra, xuất hiện các vết hình thoi đặc trưng trên lá, bẹ lá có tâm xám nhạt và viền đỏ nâu. Trong điều kiện độ ẩm cao, bệnh phát tán nhanh gây thối cổ bông và sập lúa cục bộ.</p>
+          </div>
+          <div class="text-xs bg-black/30 p-2.5 rounded border border-white/5 text-gray-500">
+            <strong class="text-gray-400">Cách xử lý tiêu biểu:</strong> Phun Tricyclazole hoặc Isoprothiolane. Tháo cạn nước ruộng để khô ẩm.
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: BLB -->
+      <div class="glass disease-card">
+        <img src="uploads/rice_blb.png" alt="Bạc lá" class="disease-card-img">
+        <div class="p-5 flex-1 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-start mb-2">
+              <h3 class="font-bold text-lg text-white">Bạc Lá</h3>
+              <span class="text-xs px-2.5 py-1 rounded bg-red-500/10 border border-red-500/30 text-red-400 font-semibold">● Nguy cơ cao</span>
+            </div>
+            <p class="text-xs font-mono text-emerald-400 mb-3">Bacterial Leaf Blight (Xanthomonas oryzae)</p>
+            <p class="text-sm text-gray-400 leading-relaxed mb-4">Gây ra bởi vi khuẩn thâm nhập qua vết thương lá. Triệu chứng là mép lá cháy vàng từ chóp lá lan xuống dưới dọc theo hai rìa lá, vết cháy uốn lượn lọng sóng màu trắng xám.</p>
+          </div>
+          <div class="text-xs bg-black/30 p-2.5 rounded border border-white/5 text-gray-500">
+            <strong class="text-gray-400">Cách xử lý tiêu biểu:</strong> Sử dụng thuốc gốc đồng, tuyệt đối không bón thêm phân đạm, tăng phân kali.
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Sheath Blight -->
+      <div class="glass disease-card">
+        <img src="uploads/rice_sheath_blight.png" alt="Khô vằn" class="disease-card-img">
+        <div class="p-5 flex-1 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-start mb-2">
+              <h3 class="font-bold text-lg text-white">Khô Vằn</h3>
+              <span class="text-xs px-2.5 py-1 rounded bg-orange-500/10 border border-orange-500/30 text-orange-400 font-semibold">● Trung bình</span>
+            </div>
+            <p class="text-xs font-mono text-emerald-400 mb-3">Sheath Blight (Rhizoctonia solani)</p>
+            <p class="text-sm text-gray-400 leading-relaxed mb-4">Bệnh nấm phát triển mạnh từ các bẹ lá sát gốc bông, tạo ra các vết loang lổ giống như vân mây màu xanh xám, trắng xanh. Bệnh làm tắc nghẽn quá trình chuyển hóa dinh dưỡng gây đổ ngã.</p>
+          </div>
+          <div class="text-xs bg-black/30 p-2.5 rounded border border-white/5 text-gray-500">
+            <strong class="text-gray-400">Cách xử lý tiêu biểu:</strong> Phun Validamycin hoặc Hexaconazole. Tỉa thưa gốc lúa để giảm độ ẩm gốc.
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: Brown Spot -->
+      <div class="glass disease-card">
+        <img src="uploads/rice_brown_spot.png" alt="Đốm nâu" class="disease-card-img">
+        <div class="p-5 flex-1 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-start mb-2">
+              <h3 class="font-bold text-lg text-white">Đốm Nâu</h3>
+              <span class="text-xs px-2.5 py-1 rounded bg-orange-500/10 border border-orange-500/30 text-orange-400 font-semibold">● Trung bình</span>
+            </div>
+            <p class="text-xs font-mono text-emerald-400 mb-3">Brown Spot (Bipolaris oryzae)</p>
+            <p class="text-sm text-gray-400 leading-relaxed mb-4">Thường xuất hiện nhiều nhất ở các vùng đất chua nghèo dinh dưỡng. Vết bệnh là các hạt đốm màu nâu nhỏ tròn hoặc bầu dục phủ khắp mặt lá, làm giảm đáng kể năng lực quang hợp.</p>
+          </div>
+          <div class="text-xs bg-black/30 p-2.5 rounded border border-white/5 text-gray-500">
+            <strong class="text-gray-400">Cách xử lý tiêu biểu:</strong> Phun Mancozeb định kỳ, bón lân cải tạo đất chua phèn và bổ sung đầy đủ kali.
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 5: Healthy -->
+      <div class="glass disease-card">
+        <img src="uploads/rice_healthy.png" alt="Lá khỏe" class="disease-card-img">
+        <div class="p-5 flex-1 flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-start mb-2">
+              <h3 class="font-bold text-lg text-green-400">Lá Khỏe Mạnh</h3>
+              <span class="text-xs px-2.5 py-1 rounded bg-green-500/10 border border-green-500/30 text-green-400 font-semibold">● Khỏe mạnh</span>
+            </div>
+            <p class="text-xs font-mono text-emerald-400 mb-3">Healthy Leaf</p>
+            <p class="text-sm text-gray-400 leading-relaxed mb-4">Lá xanh thẳng đều, không bị đốm hại hay cháy khô. Cây có sức khỏe tốt, quá trình quang hợp tích năng lượng chất lượng cao, hứa hẹn đem lại sản lượng mùa màng bội thu.</p>
+          </div>
+          <div class="text-xs bg-black/30 p-2.5 rounded border border-white/5 text-gray-500">
+            <strong class="text-gray-400">Cách duy trì:</strong> Theo dõi sâu hại thường xuyên, cung cấp phân bón nước tưới theo chu kỳ chuẩn.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- === MODEL INSIGHT TAB === -->
+  <div id="tab-model-insight" style="display:none;">
+    <div class="section-title">Thiết kế Kiến trúc YOLOv11s + BiFormer P4</div>
+    
+    <div class="glass p-6 mb-6">
+      <h3 class="font-bold text-lg mb-4 text-emerald-400 flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+        Sơ đồ luồng xử lý dữ liệu (Inference Pipeline)
+      </h3>
+      
+      <!-- Flexbox Flow Pipeline -->
+      <div class="flex items-center justify-between gap-4 p-4 rounded-xl bg-black/40 border border-white/5 overflow-x-auto flow-container">
+        
+        <div class="flow-node">
+          <div class="text-xs text-gray-500 font-mono mb-1">INPUT</div>
+          <div class="font-semibold text-sm text-white">Ảnh lá lúa (640x640)</div>
+        </div>
+        
+        <div class="flow-arrow">➔</div>
+        
+        <div class="flow-node" style="border-color: rgba(74,222,128,0.2);">
+          <div class="text-xs text-emerald-400 font-mono mb-1">BACKBONE</div>
+          <div class="font-semibold text-sm text-white">YOLOv11 Feature Extractor</div>
+        </div>
+        
+        <div class="flow-arrow">➔</div>
+        
+        <div class="flow-node" style="border-color: rgba(167,139,250,0.3);">
+          <div class="text-xs text-purple-400 font-mono mb-1">NECK ATTENTION</div>
+          <div class="font-semibold text-sm text-white">BiFormer Attention Block</div>
+        </div>
+        
+        <div class="flow-arrow">➔</div>
+        
+        <div class="flow-node" style="border-color: rgba(251,146,60,0.3);">
+          <div class="text-xs text-orange-400 font-mono mb-1">4-SCALE HEADS</div>
+          <div class="font-semibold text-sm text-white">Multi-scale Heads (P2, P3, P4, P5)</div>
+        </div>
+        
+        <div class="flow-arrow">➔</div>
+        
+        <div class="flow-node">
+          <div class="text-xs text-gray-500 font-mono mb-1">OUTPUT</div>
+          <div class="font-semibold text-sm text-emerald-400 font-mono">BBox + Label + Conf</div>
+        </div>
+        
+      </div>
+    </div>
+
+    <!-- Explanation layout -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      
+      <!-- Block 1: BiFormer Neck Attention -->
+      <div class="glass p-6">
+        <h4 class="font-bold text-white text-lg mb-3 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+          Cơ chế Chú ý BiFormer (Bi-level Routing Attention)
+        </h4>
+        <p class="text-sm text-gray-400 leading-relaxed mb-4">
+          Trong việc chẩn đoán bệnh lá lúa, các đốm bệnh thường rất nhỏ và mật độ không đều, làm cho các cơ chế chú ý toàn cục truyền thống (Global Self-Attention) tốn kém tài nguyên tính toán không cần thiết và dễ bị nhiễu bởi nền đất/lá khỏe.
+        </p>
+        <p class="text-sm text-gray-400 leading-relaxed">
+          <strong class="text-emerald-400">BiFormer</strong> sử dụng cơ chế định tuyến mức khối (Bi-level Routing Attention - BRA). Hệ thống trước tiên lọc và định tuyến các vùng truy vấn (queries) đến các khối chứa chìa khóa/giá trị (keys/values) có liên quan nhất. Từ đó chỉ tính toán sự chú ý cục bộ và chọn lọc, giúp loại bỏ nhiễu nền, tăng tốc độ xử lý và cải thiện cực lớn độ nhạy với các đốm bệnh mờ nhạt.
+        </p>
+      </div>
+
+      <!-- Block 2: 4-Scale Detection P4 -->
+      <div class="glass p-6">
+        <h4 class="font-bold text-white text-lg mb-3 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-orange-400"></span>
+          Đầu phát hiện 4 tầng (4-scale Detection Head)
+        </h4>
+        <p class="text-sm text-gray-400 leading-relaxed mb-4">
+          Mô hình YOLO chuẩn thường chỉ thực hiện phát hiện vật thể ở 3 mức phân giải đặc trưng ($8\times$, $16\times$, $32\times$ downsampling - tương đương đầu P3, P4, P5). Tuy nhiên các vết bệnh lúc mới phát triển (như đốm kim châm của bệnh đạo ôn hoặc đốm nâu mới nảy mầm) thường chỉ rộng vài pixel.
+        </p>
+        <p class="text-sm text-gray-400 leading-relaxed">
+          Bằng việc bổ sung tầng phân giải thứ tư <strong class="text-emerald-400">P2 ($4\times$ downsampling)</strong>, mạng nơ-ron giữ lại lượng lớn đặc trưng không gian có độ phân giải cao. Nhờ đó, mô hình có khả năng định vị chính xác cao độ và khoanh vùng các vết bệnh cực kỳ nhỏ lẻ, hỗ trợ chẩn đoán và phun phòng ngừa từ rất sớm.
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- === ANALYTICS TAB === -->
+  <div id="tab-analytics" style="display:none;">
+    <div class="section-title">So sánh Hiệu năng hai Model Huấn luyện Thực tế</div>
+    
+    <!-- Real statistics cards Comparison -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <!-- YOLOv11s-50e Card -->
+      <div class="glass p-6 border-l-4 border-emerald-500/80">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            YOLOv11s-50e
+          </h3>
+          <span class="text-[10px] font-mono bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20">Mô hình YOLOv11s</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="bg-black/30 rounded-lg p-2.5 text-center border border-white/5">
+            <div class="text-xl font-bold font-mono text-emerald-400">48.7%</div>
+            <div class="text-[9px] text-gray-500 mt-0.5 uppercase tracking-wider font-mono">Precision</div>
+          </div>
+          <div class="bg-black/30 rounded-lg p-2.5 text-center border border-white/5">
+            <div class="text-xl font-bold font-mono text-emerald-400">47.6%</div>
+            <div class="text-[9px] text-gray-500 mt-0.5 uppercase tracking-wider font-mono">Recall</div>
+          </div>
+          <div class="bg-black/30 rounded-lg p-2.5 text-center border border-white/5">
+            <div class="text-xl font-bold font-mono text-emerald-400">45.8%</div>
+            <div class="text-[9px] text-gray-500 mt-0.5 uppercase tracking-wider font-mono">mAP @50</div>
+          </div>
+          <div class="bg-black/30 rounded-lg p-2.5 text-center border border-white/5">
+            <div class="text-xl font-bold font-mono text-emerald-400">19.2 MB</div>
+            <div class="text-[9px] text-gray-500 mt-0.5 uppercase tracking-wider font-mono">Dung lượng</div>
+          </div>
+        </div>
+        <p class="text-xs text-gray-400 mt-3.5 leading-relaxed">
+          Mô hình YOLOv11s cơ bản được huấn luyện qua 50 epochs. Đạt độ cân bằng tối ưu giữa độ chính xác và tốc độ suy luận xử lý thời gian thực.
+        </p>
+      </div>
+
+      <!-- BiFormer-P4-40e Card -->
+      <div class="glass p-6 border-l-4 border-violet-500/80">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-violet-400 animate-pulse"></span>
+            BiFormer-P4-40e
+          </h3>
+          <span class="text-[10px] font-mono bg-violet-500/10 text-violet-400 px-2 py-0.5 rounded-full border border-violet-500/20">BiFormer + P2/P4 Head</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="bg-black/30 rounded-lg p-2.5 text-center border border-white/5">
+            <div class="text-xl font-bold font-mono text-violet-400">50.6%</div>
+            <div class="text-[9px] text-gray-500 mt-0.5 uppercase tracking-wider font-mono">Precision</div>
+          </div>
+          <div class="bg-black/30 rounded-lg p-2.5 text-center border border-white/5">
+            <div class="text-xl font-bold font-mono text-violet-400">46.8%</div>
+            <div class="text-[9px] text-gray-500 mt-0.5 uppercase tracking-wider font-mono">Recall</div>
+          </div>
+          <div class="bg-black/30 rounded-lg p-2.5 text-center border border-white/5">
+            <div class="text-xl font-bold font-mono text-violet-400">45.0%</div>
+            <div class="text-[9px] text-gray-500 mt-0.5 uppercase tracking-wider font-mono">mAP @50</div>
+          </div>
+          <div class="bg-black/30 rounded-lg p-2.5 text-center border border-white/5">
+            <div class="text-xl font-bold font-mono text-violet-400">19.7 MB</div>
+            <div class="text-[9px] text-gray-500 mt-0.5 uppercase tracking-wider font-mono">Dung lượng</div>
+          </div>
+        </div>
+        <p class="text-xs text-gray-400 mt-3.5 leading-relaxed">
+          Tích hợp cơ chế Attention phân chia động (Bi-level Routing Attention) ở Neck và đầu phát hiện 4 tầng (scale P2). Độ chính xác cực cao (Precision 50.6%) giúp phát hiện đốm bệnh nhỏ tốt hơn và giảm chẩn đoán nhầm.
+        </p>
+      </div>
+    </div>
+
+    <!-- Model Chart Selector -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 border-b border-white/10 pb-4">
+      <div>
+        <h4 class="text-md font-bold text-white">Đồ thị huấn luyện chi tiết</h4>
+        <p class="text-xs text-gray-500 mt-0.5">Chọn mô hình để xem biểu đồ kết quả, ma trận nhầm lẫn và các đường cong hiệu năng tương ứng.</p>
+      </div>
+      <div class="flex bg-black/40 p-1 rounded-lg border border-white/10">
+        <button id="chart-btn-yolo" class="px-4 py-1.5 rounded-md text-xs font-medium text-white bg-emerald-500/80 transition-all shadow-sm" onclick="switchChartModel('yolo')">YOLOv11s-50e</button>
+        <button id="chart-btn-biformer" class="px-4 py-1.5 rounded-md text-xs font-medium text-gray-400 hover:text-white transition-all" onclick="switchChartModel('biformer')">BiFormer-P4-40e</button>
+      </div>
+    </div>
+
+    <!-- Graphics Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      
+      <!-- Chart 1: Results Curves -->
+      <div class="glass p-5">
+        <h4 class="font-bold text-white text-sm font-mono uppercase tracking-wider mb-3 border-b border-white/5 pb-2">Đường cong Loss & mAP (results.png)</h4>
+        <div class="rounded-lg overflow-hidden border border-white/5 bg-black/40 p-2">
+          <img id="chart-results" src="uploads/yolo_results.png" alt="Kết quả Loss & mAP" class="w-full h-auto">
+        </div>
+        <p id="desc-results" class="text-xs text-gray-500 mt-2 leading-relaxed">Thể hiện sự giảm dần của hao hụt hộp (box_loss), mất mát lớp (cls_loss) và dfl_loss trên tập Train/Val qua 50 epochs, song song với việc tăng trưởng ổn định của độ đo mAP50.</p>
+      </div>
+
+      <!-- Chart 2: Confusion Matrix -->
+      <div class="glass p-5">
+        <h4 class="font-bold text-white text-sm font-mono uppercase tracking-wider mb-3 border-b border-white/5 pb-2">Ma trận nhầm lẫn chuẩn hóa (confusion_matrix.png)</h4>
+        <div class="rounded-lg overflow-hidden border border-white/5 bg-black/40 p-2">
+          <img id="chart-confusion" src="uploads/yolo_confusion_matrix.png" alt="Confusion Matrix" class="w-full h-auto">
+        </div>
+        <p class="text-xs text-gray-500 mt-2 leading-relaxed">Đo lường chi tiết sự phân loại đúng đắn của từng lớp bệnh. Giúp đánh giá tỷ lệ nhầm lẫn giữa các đốm bệnh tương đồng nhau như đốm nâu và đạo ôn lá.</p>
+      </div>
+
+      <!-- Chart 3: Precision-Recall Curve -->
+      <div class="glass p-5">
+        <h4 class="font-bold text-white text-sm font-mono uppercase tracking-wider mb-3 border-b border-white/5 pb-2">Đường cong Precision-Recall (BoxPR_curve.png)</h4>
+        <div class="rounded-lg overflow-hidden border border-white/5 bg-black/40 p-2">
+          <img id="chart-pr" src="uploads/yolo_pr_curve.png" alt="Precision-Recall Curve" class="w-full h-auto">
+        </div>
+        <p class="text-xs text-gray-500 mt-2 leading-relaxed">Đường cong cân bằng giữa độ chính xác dự đoán (Precision) và tỷ lệ tìm thấy vết bệnh thực tế (Recall) tại các ngưỡng confidence khác nhau của từng lớp bệnh.</p>
+      </div>
+
+      <!-- Chart 4: F1-Confidence Curve -->
+      <div class="glass p-5">
+        <h4 class="font-bold text-white text-sm font-mono uppercase tracking-wider mb-3 border-b border-white/5 pb-2">Đường cong F1-Score theo Confidence (BoxF1_curve.png)</h4>
+        <div class="rounded-lg overflow-hidden border border-white/5 bg-black/40 p-2">
+          <img id="chart-f1" src="uploads/yolo_f1_curve.png" alt="F1-Confidence Curve" class="w-full h-auto">
+        </div>
+        <p class="text-xs text-gray-500 mt-2 leading-relaxed">Đồ thị F1-Score giúp xác định điểm tin cậy (Confidence Threshold) tối ưu nhất để lấy quyết định chẩn đoán (thường đạt cực đại ở mức conf quanh 0.25 - 0.35).</p>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ====================== CONFIG ======================
+const API_BASE = 'http://localhost:8080/api'; // Đổi URL Spring Boot
+const DISEASE_VI = {
+  'Leaf Blast': 'Đạo Ôn', 'Bacterial Leaf Blight': 'Bạc Lá',
+  'Sheath Blight': 'Khô Vằn', 'Brown Spot': 'Đốm Nâu', 'Healthy': 'Lá Khỏe'
+};
+const DISEASE_COLORS = {
+  'Leaf Blast': '#f87171', 'Bacterial Leaf Blight': '#fb923c',
+  'Sheath Blight': '#facc15', 'Brown Spot': '#a78bfa', 'Healthy': '#4ade80'
+};
+
+let currentFile = null;
+let histPage = 0;
+let allHistory = [];
+
+// ====================== UPLOAD ======================
+function handleFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) { alert('File quá lớn. Tối đa 10MB.'); return; }
+  currentFile = file;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('previewImg').src = e.target.result;
+    document.getElementById('fileInfo').textContent =
+      `${file.name} · ${(file.size / 1024).toFixed(0)} KB · ${file.type}`;
+    document.getElementById('uploadZone').style.display = 'none';
+    document.getElementById('previewSection').classList.add('visible');
+    // Reset result
+    document.getElementById('resultCard').classList.remove('visible');
+    document.getElementById('resultPlaceholder').style.display = 'flex';
+  };
+  reader.readAsDataURL(file);
+}
+
+function resetUpload() {
+  currentFile = null;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('uploadZone').style.display = 'block';
+  document.getElementById('previewSection').classList.remove('visible');
+  document.getElementById('resultCard').classList.remove('visible');
+  document.getElementById('resultPlaceholder').style.display = 'flex';
+}
+
+// Drag & drop
+const zone = document.getElementById('uploadZone');
+if (zone) {
+  zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault(); zone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      const input = document.getElementById('fileInput');
+      const dt = new DataTransfer(); dt.items.add(file); input.files = dt.files;
+      handleFile({ target: { files: [file] } });
+    }
+  });
+}
+
+// ====================== DIAGNOSE ======================
+async function submitDiagnosis() {
+  if (!currentFile) return;
+  const btn = document.getElementById('diagnoseBtn');
+  btn.disabled = true;
+  document.getElementById('loadingOverlay').classList.add('active');
+
+  try {
+    const modelType = document.getElementById('modelSelect').value;
+    const formData = new FormData();
+    formData.append('image', currentFile);
+    formData.append('modelType', modelType);
+
+    const response = await fetch(`${API_BASE}/diagnose`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) throw new Error(`Server lỗi: ${response.status}`);
+    const data = await response.json();
+    renderResult(data);
+
+    // Thêm vào history local
+    allHistory.unshift(data);
+    saveHistoryLocal(data);
+
+  } catch (err) {
+    console.error(err);
+    // Demo mode: tạo mock data khi không có server
+    renderResult(getMockResult());
+    alert('⚠️ Không kết nối được Spring Boot. Hiển thị kết quả Demo.');
+  } finally {
+    document.getElementById('loadingOverlay').classList.remove('active');
+    btn.disabled = false;
+  }
+}
+
+function getMockResult() {
+  const diseases = [
+    { label:'Brown Spot', classIndex:3, confidence:0.87, treatment:'Bón kali, phun Mancozeb hoặc Propiconazole định kỳ.', vietnameseName:'Đốm Nâu' },
+    { label:'Leaf Blast', classIndex:0, confidence:0.92, treatment:'Phun thuốc Tricyclazole hoặc Isoprothiolane. Thoát nước ruộng 3-5 ngày.', vietnameseName:'Đạo Ôn' },
+    { label:'Healthy', classIndex:4, confidence:0.98, treatment:'Lá lúa khỏe mạnh. Tiếp tục chăm sóc theo quy trình hiện tại.', vietnameseName:'Lá Khỏe' },
+  ];
+  const d = diseases[Math.floor(Math.random() * diseases.length)];
+  return { ...d, id: Date.now(), annotatedImageBase64: null, createdAt: new Date().toISOString() };
+}
+
+function renderResult(data) {
+  const color = DISEASE_COLORS[data.label] || '#4ade80';
+  const viName = data.vietnameseName || DISEASE_VI[data.label] || data.label;
+  const conf = Math.round(data.confidence * 100);
+
+  document.getElementById('diseaseLabel').textContent = `${viName} (${data.label})`;
+  document.getElementById('diseaseLabel').style.color = color;
+  document.getElementById('diseaseBadge').style.background = color + '18';
+  document.getElementById('diseaseBadge').style.borderColor = color + '40';
+  document.getElementById('diseaseBadge').querySelector('.dot').style.background = color;
+
+  document.getElementById('confValue').textContent = `${conf}%`;
+  document.getElementById('confValue').style.color = color;
+  setTimeout(() => {
+    document.getElementById('confBar').style.width = conf + '%';
+    document.getElementById('confBar').style.background = `linear-gradient(90deg, ${color}88, ${color})`;
+  }, 100);
+
+  document.getElementById('treatmentText').textContent = data.treatment || '—';
+
+  // Cập nhật previewImg và annotatedImg với URL ảnh tĩnh nhận diện
+  if (data.imageUrl) {
+    let imgUrl = data.imageUrl;
+    // Nếu đường dẫn là tương đối dạng /uploads/..., nối thêm origin của API_BASE nếu cần thiết
+    if (imgUrl.startsWith('/') && API_BASE.startsWith('http')) {
+      const backendOrigin = new URL(API_BASE).origin;
+      imgUrl = backendOrigin + imgUrl;
+    }
+    document.getElementById('previewImg').src = imgUrl;
+    document.getElementById('annotatedImg').src = imgUrl;
+    document.getElementById('annotatedWrap').style.display = 'block';
+  } else if (data.annotatedImageBase64) {
+    const base64Src = 'data:image/jpeg;base64,' + data.annotatedImageBase64;
+    document.getElementById('previewImg').src = base64Src;
+    document.getElementById('annotatedImg').src = base64Src;
+    document.getElementById('annotatedWrap').style.display = 'block';
+  } else {
+    document.getElementById('annotatedWrap').style.display = 'none';
+  }
+
+  document.getElementById('resultPlaceholder').style.display = 'none';
+  document.getElementById('resultCard').classList.add('visible');
+  document.getElementById('resultCard').classList.add('fade-in');
+}
+
+// ====================== HISTORY ======================
+function saveHistoryLocal(data) {
+  const stored = JSON.parse(localStorage.getItem('rice_history') || '[]');
+  stored.unshift({
+    id: data.id || Date.now(),
+    label: data.label,
+    confidence: data.confidence,
+    createdAt: data.createdAt || new Date().toISOString()
+  });
+  localStorage.setItem('rice_history', JSON.stringify(stored.slice(0, 100)));
+}
+
+async function loadHistory() {
+  try {
+    const filter = document.getElementById('filterDisease').value;
+    const resp = await fetch(`${API_BASE}/history?page=${histPage}&size=10`);
+    if (!resp.ok) throw new Error();
+    const data = await resp.json();
+    renderHistory(data.content, data.totalElements, data.totalPages);
+  } catch {
+    // Demo: dùng localStorage
+    let local = JSON.parse(localStorage.getItem('rice_history') || '[]');
+    const filter = document.getElementById('filterDisease').value;
+    if (filter) local = local.filter(x => x.label === filter);
+    renderHistory(local.slice(histPage * 10, (histPage + 1) * 10), local.length, Math.ceil(local.length / 10));
+  }
+}
+
+function filterHistory() { histPage = 0; loadHistory(); }
+
+function renderHistory(records, total, totalPages) {
+  document.getElementById('histCount').textContent = `Tổng: ${total} bản ghi`;
+  const tbody = document.getElementById('historyBody');
+
+  if (!records.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:2.5rem; color:rgba(255,255,255,0.25);">Không có dữ liệu</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = records.map(r => {
+    const color = DISEASE_COLORS[r.label] || '#fff';
+    const conf = Math.round((r.confidence || 0) * 100);
+    const viName = DISEASE_VI[r.label] || r.label;
+    const date = r.createdAt ? new Date(r.createdAt).toLocaleString('vi-VN') : '—';
+    return `<tr>
+      <td style="font-family:'Space Mono',monospace; font-size:0.75rem; color:rgba(255,255,255,0.3);">#${r.id}</td>
+      <td>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="width:8px; height:8px; border-radius:50%; background:${color}; display:inline-block; flex-shrink:0;"></span>
+          <span style="font-weight:500;">${viName}</span>
+        </div>
+        <div style="font-size:0.75rem; color:rgba(255,255,255,0.35); margin-top:2px; padding-left:16px;">${r.label}</div>
+      </td>
+      <td>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div style="flex:1; height:5px; border-radius:99px; background:rgba(255,255,255,0.08); overflow:hidden; max-width:80px;">
+            <div style="height:100%; width:${conf}%; background:${color}; border-radius:99px;"></div>
+          </div>
+          <span style="font-family:'Space Mono',monospace; font-size:0.8rem; color:${color};">${conf}%</span>
+        </div>
+      </td>
+      <td style="font-size:0.8rem; color:rgba(255,255,255,0.45);">${date}</td>
+      <td>
+        <button onclick="alert('Chi tiết ID: ${r.id}')" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:rgba(255,255,255,0.5); padding:4px 10px; border-radius:6px; cursor:pointer; font-size:0.75rem; font-family:'Be Vietnam Pro',sans-serif;">Chi tiết</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Pagination
+  const pg = document.getElementById('pagination');
+  if (totalPages <= 1) { pg.innerHTML = ''; return; }
+  let btns = '';
+  for (let i = 0; i < Math.min(totalPages, 7); i++) {
+    btns += `<button class="page-btn ${i === histPage ? 'active' : ''}" onclick="gotoPage(${i})">${i + 1}</button>`;
+  }
+  pg.innerHTML = btns;
+}
+
+function gotoPage(p) { histPage = p; loadHistory(); }
+
+// ====================== TABS ======================
+function switchTab(tab, btn) {
+  // Reset all tab buttons
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  // Sync Navbar Links active state
+  document.querySelectorAll('nav .nav-links a').forEach(l => l.classList.remove('active'));
+  const activeLink = document.querySelector(`nav .nav-links a[href="#${tab}"]`);
+  if (activeLink) activeLink.classList.add('active');
+
+  // Hide all tab content
+  document.getElementById('tab-diagnose').style.display = 'none';
+  document.getElementById('tab-history').style.display = 'none';
+  document.getElementById('tab-disease-info').style.display = 'none';
+  document.getElementById('tab-model-insight').style.display = 'none';
+  document.getElementById('tab-analytics').style.display = 'none';
+
+  // Show target tab content
+  const targetDiv = document.getElementById(`tab-${tab}`);
+  if (targetDiv) {
+    targetDiv.style.display = 'block';
+  }
+
+  // Load history if needed
+  if (tab === 'history') loadHistory();
+}
+
+function switchNavbarTab(tab, linkEl) {
+  // Tim button tab tuong ung de trigger click
+  const btn = document.querySelector(`.tab-btn[onclick*="'${tab}'"]`);
+  if (btn) {
+    switchTab(tab, btn);
+    // Smooth scroll to container content
+    document.getElementById('upload-sec').scrollIntoView({ behavior: 'smooth' });
+  }
+}
+
+// Switch between YOLO and BiFormer chart images in performance tab
+function switchChartModel(model) {
+  const yoloBtn = document.getElementById('chart-btn-yolo');
+  const biformerBtn = document.getElementById('chart-btn-biformer');
+  
+  if (model === 'yolo') {
+    yoloBtn.className = "px-4 py-1.5 rounded-md text-xs font-medium text-white bg-emerald-500/80 transition-all shadow-sm";
+    biformerBtn.className = "px-4 py-1.5 rounded-md text-xs font-medium text-gray-400 hover:text-white transition-all";
+    
+    document.getElementById('chart-results').src = "uploads/yolo_results.png";
+    document.getElementById('chart-confusion').src = "uploads/yolo_confusion_matrix.png";
+    document.getElementById('chart-pr').src = "uploads/yolo_pr_curve.png";
+    document.getElementById('chart-f1').src = "uploads/yolo_f1_curve.png";
+    
+    document.getElementById('desc-results').textContent = "Thể hiện sự giảm dần của hao hụt hộp (box_loss), mất mát lớp (cls_loss) và dfl_loss trên tập Train/Val qua 50 epochs, song song với việc tăng trưởng ổn định của độ đo mAP50.";
+  } else {
+    yoloBtn.className = "px-4 py-1.5 rounded-md text-xs font-medium text-gray-400 hover:text-white transition-all";
+    biformerBtn.className = "px-4 py-1.5 rounded-md text-xs font-medium text-white bg-violet-500/80 transition-all shadow-sm";
+    
+    document.getElementById('chart-results').src = "uploads/biformer_results.png";
+    document.getElementById('chart-confusion').src = "uploads/biformer_confusion_matrix.png";
+    document.getElementById('chart-pr').src = "uploads/biformer_pr_curve.png";
+    document.getElementById('chart-f1').src = "uploads/biformer_f1_curve.png";
+    
+    document.getElementById('desc-results').textContent = "Thể hiện sự giảm dần của hao hụt hộp (box_loss), mất mát lớp (cls_loss) và dfl_loss trên tập Train/Val qua 40 epochs, song song với việc tăng trưởng ổn định của độ đo mAP50.";
+  }
+}
+
+// Init
+loadHistory();
+</script>
+</body>
+</html>

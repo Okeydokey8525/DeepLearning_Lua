@@ -1,0 +1,32 @@
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Python cache / compile files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ipynb_checkpoints/
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Maven / Spring Boot build targets
+target/
+**/target/
+.mvn/wrapper/maven-wrapper.jar
+
+# Uploaded/predicted images
+**/static/uploads/predicted_*.jpg
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
