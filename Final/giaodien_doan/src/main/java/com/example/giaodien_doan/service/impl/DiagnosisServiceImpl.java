@@ -35,19 +35,19 @@ public class DiagnosisServiceImpl implements DiagnosisService {
 
     // Mapping class index → tên bệnh tiếng Việt
     private static final Map<Integer, String> DISEASE_VI = Map.of(
-            0, "Đạo Ôn (Leaf Blast)",
-            1, "Bạc Lá (Bacterial Leaf Blight)",
-            2, "Khô Vằn (Sheath Blight)",
-            3, "Đốm Nâu (Brown Spot)",
+            0, "Bạc Lá (Bacterial Leaf Blight)",
+            1, "Đốm Nâu (Brown Spot)",
+            2, "Đạo Ôn (Leaf Blast)",
+            3, "Khô Vằn (Sheath Blight)",
             4, "Lá Khỏe (Healthy)"
     );
 
     // Hướng dẫn xử lý theo class index
     private static final Map<Integer, String> TREATMENT_GUIDE = Map.of(
-            0, "Phun thuốc Tricyclazole hoặc Isoprothiolane. Thoát nước ruộng 3-5 ngày. Không bón thừa đạm.",
-            1, "Dùng thuốc gốc đồng (Bordeaux mixture). Bón kali cân đối, tránh bón thừa đạm. Vệ sinh đồng ruộng.",
-            2, "Phun Validamycin hoặc Hexaconazole. Giảm ẩm độ bằng cách tỉa thưa cây lúa.",
-            3, "Bón phân kali đầy đủ. Phun Mancozeb hoặc Propiconazole định kỳ 7-10 ngày/lần.",
+            0, "Dùng thuốc gốc đồng (Bordeaux mixture). Bón kali cân đối, tránh bón thừa đạm. Vệ sinh đồng ruộng.",
+            1, "Bón phân kali đầy đủ. Phun Mancozeb hoặc Propiconazole định kỳ 7-10 ngày/lần.",
+            2, "Phun thuốc Tricyclazole hoặc Isoprothiolane. Thoát nước ruộng 3-5 ngày. Không bón thừa đạm.",
+            3, "Phun Validamycin hoặc Hexaconazole. Giảm ẩm độ bằng cách tỉa thưa cây lúa.",
             4, "Lá lúa khỏe mạnh. Tiếp tục chăm sóc theo quy trình hiện tại, theo dõi định kỳ."
     );
 

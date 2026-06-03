@@ -98,10 +98,10 @@ app.add_middleware(
 
 # ── Constants ────────────────────────────────────────────────
 CLASS_NAMES = [
-    "Leaf Blast",
     "Bacterial Leaf Blight",
-    "Sheath Blight",
     "Brown Spot",
+    "Leaf Blast",
+    "Sheath Blight",
     "Healthy"
 ]
 
